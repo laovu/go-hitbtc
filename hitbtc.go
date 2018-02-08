@@ -100,6 +100,24 @@ func (b *HitBtc) GetSymbols() (symbols []Symbol, err error) {
 	return
 }
 
+// GetOrderBook is used to get the current book values for a market.
+func (b *HitBtc) GetDepth(market,limit string) (book Depth, err error) {
+	payload := make(map[string]string)
+	payload["limit"] = limit 
+	r, err := b.client.do("GET", "public/orderbook/"+strings.ToUpper(market), payload, false)
+	if err != nil {
+		return
+	}
+	var response interface{}
+	if err = json.Unmarshal(r, &response); err != nil {
+		return
+	}
+	if err = handleErr(response); err != nil {
+		return
+	}
+	err = json.Unmarshal(r, &book)
+	return
+}
 // GetTicker is used to get the current ticker values for a market.
 func (b *HitBtc) GetTicker(market string) (ticker Ticker, err error) {
 	r, err := b.client.do("GET", "public/ticker/"+strings.ToUpper(market), nil, false)
@@ -205,6 +223,22 @@ func (b *HitBtc) GetTrades(currencyPair string) (trades []Trade, err error) {
 	err = json.Unmarshal(r, &trades)
 	return
 }
+func (b *HitBtc) CancelOrderByid(cid string) (order Order, err error) {
+    r, err := b.client.do("DELETE", "order/"+cid, nil, true)
+    if err != nil {
+        return
+    }
+    var response interface{}
+    if err = json.Unmarshal(r, &response); err != nil {
+        return
+    }
+    if err = handleErr(response); err != nil {
+        return
+    }
+   // fmt.Println("r:",string(r))
+    err = json.Unmarshal(r, &order)
+    return
+}
 
 func (b *HitBtc) CancelOrder(currencyPair string) (orders []Order, err error) {
     payload := make(map[string]string)
@@ -276,18 +310,38 @@ func (b *HitBtc) GetOpenOrders() (orders []Order, err error) {
     return
 }
 
+func (b *HitBtc) LimitBuy(amount ,price float64,symbol string) (resp Order,err error){
+	var rOrder Order
+	rOrder.Symbol = symbol
+	rOrder.Side = "buy"
+	rOrder.Type = "limit"
+	rOrder.Quantity = amount
+	rOrder.Price = price
+	return b.PlaceOrder(rOrder)
+}
+
+func (b *HitBtc) LimitSell(amount ,price float64,symbol string) (resp Order,err error){
+	var rOrder Order
+	rOrder.Symbol = symbol
+	rOrder.Side = "sell"
+	rOrder.Type = "limit"
+	rOrder.Quantity = amount
+	rOrder.Price = price
+	return b.PlaceOrder(rOrder)
+}
+
+
 func (b *HitBtc) PlaceOrder(requestOrder Order) (responseOrder Order, err error) {
     payload := make(map[string]string)
-
     payload["symbol"] = requestOrder.Symbol
     payload["side"] = requestOrder.Side
     payload["type"] = requestOrder.Type
-    payload["timeInForce"] = requestOrder.TimeInForce
     payload["quantity"] = fmt.Sprintf("%.8f", requestOrder.Quantity)
     payload["price"] = fmt.Sprintf("%.8f", requestOrder.Price)
 
-    r, err := b.client.do("PUT", "order/"+requestOrder.ClientOrderId, payload, true)
+    r, err := b.client.do("POST", "order", payload, true)
     if err != nil {
+    	fmt.Println("resp:",string(r))
         return
     }
     var response interface{}
